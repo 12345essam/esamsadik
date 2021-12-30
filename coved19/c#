@@ -1,0 +1,214 @@
+using System;
+using Telegram.Bot;
+using Telegram.Bot.Exceptions;
+using Telegram.Bot.Types.Enums;
+using Telegram.Bot.Types.InlineQueryResults;
+using Telegram.Bot.Types.ReplyMarkups;
+using System.Threading;
+using System.Threading.Tasks;
+using Telegram.Bot.Extensions.Polling;
+using Telegram.Bot.Types;
+
+namespace CovidVaccineBot
+{
+    class Program
+    {
+
+        private static TelegramBotClient? bot;
+
+        public static async Task Main()
+        {
+            bot = new TelegramBotClient("5025078280:AAHYrpWOy_-SVeRFt_cL27-EgBejpmXJlug");
+
+            User me = await bot.GetMeAsync();
+            Console.Title = me.Username ?? "Covid Vaccine bot";
+
+            using var cts = new CancellationTokenSource();
+
+            ReceiverOptions receiverOptions = new() { AllowedUpdates = { } };
+            bot.StartReceiving(updateHandler,
+                               errorHandler,
+                               receiverOptions,
+                               cts.Token);
+
+            Console.WriteLine($"Start listening for @{me.Username}");
+            Console.ReadLine();
+            cts.Cancel();
+        }
+
+        public static Task errorHandler(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
+        {
+            var ErrorMessage = exception switch
+            {
+                ApiRequestException apiRequestException => $"Telegram API Error:\n[{apiRequestException.ErrorCode}]\n{apiRequestException.Message}",
+                _ => exception.ToString()
+            };
+
+            Console.WriteLine(ErrorMessage);
+            return Task.CompletedTask;
+        }
+
+        public static async Task updateHandler(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
+        {
+            var handler = update.Type switch
+            {
+                UpdateType.Message => BotOnMessageReceived(botClient, update.Message!),
+                UpdateType.EditedMessage => BotOnMessageReceived(botClient, update.EditedMessage!),
+                _ => UnknownUpdateHandlerAsync(botClient, update)
+            };
+
+            try
+            {
+                await handler;
+            }
+            catch (Exception exception)
+            {
+                await errorHandler(botClient, exception, cancellationToken);
+            }
+        }
+
+        private static Task UnknownUpdateHandlerAsync(ITelegramBotClient botClient, Update update)
+        {
+            Console.WriteLine($"Unknown update type: {update.Type}");
+            return Task.CompletedTask;
+        }
+
+        private static async Task BotOnMessageReceived(ITelegramBotClient botClient, Message message)
+        {
+            Console.WriteLine($"Receive message type: {message.Type}");
+            if (message.Type != MessageType.Text)
+                return;
+
+            var action = message.Text switch
+            {
+                "/start" => help(botClient, message),
+                "/keyboard" => SendReplyKeyboard(botClient, message),
+                "/help" => help(botClient, message),
+                _ => DateDose(botClient, message)
+            };
+            Message sentMessage = await action;
+            Console.WriteLine($"The message was sent with id: {sentMessage.MessageId}");
+
+
+
+            static async Task<Message> help(ITelegramBotClient botClient, Message message)
+            {
+
+                return await botClient.SendTextMessageAsync(chatId: message.Chat.Id,
+                                                            text: "Click on the keyboard and choose the type of vaccine.\n" +
+                                                            "/keyboard"
+                                                            );
+            }
+
+
+            static async Task<Message> SendReplyKeyboard(ITelegramBotClient botClient, Message message)
+            {
+                ReplyKeyboardMarkup replyKeyboardMarkup = new(
+                    new[]
+                    {
+                        new KeyboardButton[] { "Pfizer/BioNTech", "AstraZeneca"},
+                        new KeyboardButton[] { "Janssen", "Sinopharm"},
+                        new KeyboardButton[] { "COVAXIN", "Moderna"},
+                        new KeyboardButton[] { "Sinovac-CoronaVac"},
+                    })
+                {
+                    ResizeKeyboard = true
+                };
+
+                return await botClient.SendTextMessageAsync(chatId: message.Chat.Id,
+                                                            text: "Choose",
+                                                            replyMarkup: replyKeyboardMarkup);
+            }
+
+        }
+
+
+        static async Task<Message> DateDose(ITelegramBotClient botClient, Message message)
+        {
+
+            string msg = message.Text;
+            switch (msg)
+            {
+                case "Pfizer/BioNTech":
+                        return await botClient.SendTextMessageAsync(chatId: message.Chat.Id,
+                                                                text: "Second dose time: After 21 days.",
+                                                                replyMarkup: new InlineKeyboardMarkup(
+                                                                InlineKeyboardButton.WithUrl(
+                                                                "Click for more info",
+                                                                "https://www.who.int/news-room/questions-and-answers/item/coronavirus-disease-(covid-19)-vaccines"))
+                                                            );
+                    break;
+                case "AstraZeneca":
+                    return await botClient.SendTextMessageAsync(chatId: message.Chat.Id,
+                                                            text: "Second dose time: After 4 to 12 weeks.",
+                                                            replyMarkup: new InlineKeyboardMarkup(
+                                                            InlineKeyboardButton.WithUrl(
+                                                                "Click for more info",
+                                                                "https://www.who.int/news-room/questions-and-answers/item/coronavirus-disease-(covid-19)-vaccines"))
+                                                            );
+                    break;
+                case "Janssen":
+                    return await botClient.SendTextMessageAsync(chatId: message.Chat.Id,
+                                                            text: "Second dose time: After 2 months.",
+                                                            replyMarkup: new InlineKeyboardMarkup(
+                                                            InlineKeyboardButton.WithUrl(
+                                                                "Click for more info",
+                                                                "https://www.who.int/news-room/questions-and-answers/item/coronavirus-disease-(covid-19)-vaccines"))
+                                                            );
+                    break;
+                case "Sinopharm":
+                    return await botClient.SendTextMessageAsync(chatId: message.Chat.Id,
+                                                            text: "Second dose time: After 3 to 4 weeks.",
+                                                            replyMarkup: new InlineKeyboardMarkup(
+                                                            InlineKeyboardButton.WithUrl(
+                                                                "Click for more info",
+                                                                "https://www.who.int/news-room/questions-and-answers/item/coronavirus-disease-(covid-19)-vaccines"))
+                                                            );
+                    break;
+                case "COVAXIN":
+                    return await botClient.SendTextMessageAsync(chatId: message.Chat.Id,
+                                                            text: "Second dose time: After 4 weeks.",
+                                                            replyMarkup: new InlineKeyboardMarkup(
+                                                            InlineKeyboardButton.WithUrl(
+                                                                "Click for more info",
+                                                                "https://www.who.int/news-room/questions-and-answers/item/coronavirus-disease-(covid-19)-vaccines"))
+                                                            );
+                    break;
+                case "Moderna":
+                    return await botClient.SendTextMessageAsync(chatId: message.Chat.Id,
+                                                            text: "Second dose time: After 28 days.",
+                                                            replyMarkup: new InlineKeyboardMarkup(
+                                                            InlineKeyboardButton.WithUrl(
+                                                                "Click for more info",
+                                                                "https://www.who.int/news-room/questions-and-answers/item/coronavirus-disease-(covid-19)-vaccines"))
+                                                            );
+                    break;
+                case "Sinovac-CoronaVac":
+                    return await botClient.SendTextMessageAsync(chatId: message.Chat.Id,
+                                                            text: "Second dose time: After 2 to 4 weeks.",
+                                                            replyMarkup: new InlineKeyboardMarkup(
+                                                            InlineKeyboardButton.WithUrl(
+                                                                "Click for more info",
+                                                                "https://www.who.int/news-room/questions-and-answers/item/coronavirus-disease-(covid-19)-vaccines"))
+                                                            );
+                    break;
+                default:
+                    return await botClient.SendTextMessageAsync(chatId: message.Chat.Id,
+                                                            text: "Click on the keyboard and choose the type of vaccine.\n" +
+                                                            "/keyboard"
+                                                            );
+                    break;
+
+            }
+
+
+
+        }
+
+
+
+
+    }
+}
+
+
